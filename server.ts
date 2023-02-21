@@ -10,7 +10,7 @@ const lru = new LRU<Map<string, string>>(100);
 
 async function getMetadata(url: string) {
   const map = new Map();
-  // if (url.indexOf(":ogp.deno.dev") > 0) {
+  // if (url.indexOf(":flycat-web.vercel.app/") > 0) {
   //   return map;
   // }
   try {
@@ -23,7 +23,7 @@ async function getMetadata(url: string) {
     const parser: DOMParser = new DOMParser();
     const document: HTMLDocument | null = parser.parseFromString(
       await response.text(),
-      "text/html",
+      "text/html"
     );
     if (!document) {
       return map;
@@ -40,7 +40,6 @@ async function getMetadata(url: string) {
         map.set(property.value, content.value);
       }
     });
-    console.log(map);
     lru.set(url, map);
     return map;
   } catch (error) {
@@ -49,34 +48,40 @@ async function getMetadata(url: string) {
   }
 }
 
-function getMetaDataFromMap(url: string, map: Map<any, any>){
+function getMetaDataFromMap(url: string, map: Map<any, any>) {
   let image = map.get("og:image") || map.get("twitter:image:src") || "";
   if (image.startsWith("/")) {
     const u = new URL(url);
     image = u.protocol + "//" + u.host + image;
   }
   const title = map.get("og:title") || map.get("twitter:title") || "";
-  const description = map.get("og:description") || map.get("twitter:description") || "";
+  const description =
+    map.get("og:description") || map.get("twitter:description") || "";
   const siteName = map.get("og:site_name") || map.get("twitter:site") || "";
   return {
     url,
     title,
     image,
     description,
-    siteName
-  }
+    siteName,
+  };
 }
 
 async function handler(_req: Request): Promise<Response> {
-  const url = "https://getalby.com/"
+  const requestUrl = new URL(_req.url);
+  const url = requestUrl.searchParams.get("url");
+  if (!url) {
+    return new Response("{}", {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const map = await getMetadata(url);
-  console.log(map)
   const data = getMetaDataFromMap(url, map);
   const json = JSON.stringify(data);
   return new Response(json, {
     headers: { "Content-Type": "application/json" },
   });
-
 }
 
 serve(handler);
