@@ -9,6 +9,17 @@ import LRU from "https://deno.land/x/lru@1.0.2/mod.ts";
 
 const lru = new LRU<Map<string, string>>(100);
 
+function getMetaTagValue(document: HTMLDocument, metaName: string) {
+  const metas = document.getElementsByTagName("meta");
+  for (let i = 0; i < metas.length; i++) {
+    if (metas[i].getAttribute("name") === metaName) {
+      return metas[i].getAttribute("content");
+    }
+  }
+
+  return null;
+}
+
 async function getMetadata(url: string) {
   const map = new Map();
   // if (url.indexOf(":flycat-web.vercel.app/") > 0) {
@@ -29,6 +40,7 @@ async function getMetadata(url: string) {
     if (!document) {
       return map;
     }
+
     document.getElementsByTagName("meta").forEach((a) => {
       const name = a.attributes.getNamedItem("name");
       if (name && name.value?.startsWith("twitter:")) {
@@ -41,6 +53,10 @@ async function getMetadata(url: string) {
         map.set(property.value, content.value);
       }
     });
+    if (!map.get("title")) map.set("title", document.title);
+    if (!map.get("description"))
+      map.set("description", getMetaTagValue(document, "description"));
+
     lru.set(url, map);
     return map;
   } catch (error) {
@@ -55,9 +71,13 @@ function getMetaDataFromMap(url: string, map: Map<any, any>) {
     const u = new URL(url);
     image = u.protocol + "//" + u.host + image;
   }
-  const title = map.get("og:title") || map.get("twitter:title") || "";
+  const title =
+    map.get("og:title") || map.get("twitter:title") || map.get("title") || "";
   const description =
-    map.get("og:description") || map.get("twitter:description") || "";
+    map.get("og:description") ||
+    map.get("twitter:description") ||
+    map.get("description") ||
+    "";
   const siteName = map.get("og:site_name") || map.get("twitter:site") || "";
   return {
     url,
