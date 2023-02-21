@@ -3,7 +3,8 @@ import {
   DOMParser,
   HTMLDocument,
 } from "https://deno.land/x/deno_dom@v0.1.15-alpha/deno-dom-wasm.ts";
-
+import { Application, Router } from "https://deno.land/x/oak/mod.ts";
+import { oakCors } from "https://deno.land/x/cors/mod.ts";
 import LRU from "https://deno.land/x/lru@1.0.2/mod.ts";
 
 const lru = new LRU<Map<string, string>>(100);
@@ -67,21 +68,27 @@ function getMetaDataFromMap(url: string, map: Map<any, any>) {
   };
 }
 
-async function handler(_req: Request): Promise<Response> {
-  const requestUrl = new URL(_req.url);
+const app = new Application();
+const router = new Router();
+
+router.get("/", async (ctx) => {
+  const requestUrl = new URL(ctx.request.url);
   const url = requestUrl.searchParams.get("url");
   if (!url) {
-    return new Response("{}", {
-      headers: { "Content-Type": "application/json" },
-    });
+    ctx.response.body = "{}";
+    return;
   }
 
   const map = await getMetadata(url);
   const data = getMetaDataFromMap(url, map);
   const json = JSON.stringify(data);
-  return new Response(json, {
-    headers: { "Content-Type": "application/json" },
-  });
-}
+  ctx.response.body = json;
+});
 
-serve(handler);
+app.use(oakCors()); // Add CORS middleware
+app.use(router.routes());
+app.use(router.allowedMethods());
+
+const port = 8000;
+console.log(`Listening on http://localhost:${port}`);
+await app.listen({ port });
